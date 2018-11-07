@@ -15,25 +15,34 @@ import (
 	"k8s.io/apiserver/pkg/util/logs"
 	// us
 	"github.com/openshift/console-operator/pkg/cmd/operator"
+	"github.com/openshift/console-operator/pkg/cmd/version"
 )
 
 func main() {
+	// random seed, set it & forget it
 	rand.Seed(time.Now().UTC().UnixNano())
-
+	// normalize flags, if _ use -
 	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
+	// add the default flag set for go
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
+	// build a new cobra command
 	command := NewOperatorCommand()
+	// die on errors
 	if err := command.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 }
 
+// create the root "console" command
+// we will add subcommands to this
 func NewOperatorCommand() *cobra.Command {
+	// "console" just prints help, then exists.  It doesn't start
+	// the operator.
 	cmd := &cobra.Command{
 		Use:   "console",
 		Short: "Top level command",
@@ -44,6 +53,7 @@ func NewOperatorCommand() *cobra.Command {
 	}
 
 	cmd.AddCommand(operator.NewOperator())
+	cmd.AddCommand(version.NewVersion())
 
 	return cmd
 }
