@@ -3,9 +3,9 @@
 package fake
 
 import (
-	clientset "github.com/enj/example-operator/pkg/generated/clientset/versioned"
-	exampleoperatorv1alpha1 "github.com/enj/example-operator/pkg/generated/clientset/versioned/typed/example/v1alpha1"
-	fakeexampleoperatorv1alpha1 "github.com/enj/example-operator/pkg/generated/clientset/versioned/typed/example/v1alpha1/fake"
+	clientset "github.com/openshift/console-operator/pkg/generated/clientset/versioned"
+	consolev1alpha1 "github.com/openshift/console-operator/pkg/generated/clientset/versioned/typed/console/v1alpha1"
+	fakeconsolev1alpha1 "github.com/openshift/console-operator/pkg/generated/clientset/versioned/typed/console/v1alpha1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -55,12 +55,12 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 
 var _ clientset.Interface = &Clientset{}
 
-// ExampleoperatorV1alpha1 retrieves the ExampleoperatorV1alpha1Client
-func (c *Clientset) ExampleoperatorV1alpha1() exampleoperatorv1alpha1.ExampleoperatorV1alpha1Interface {
-	return &fakeexampleoperatorv1alpha1.FakeExampleoperatorV1alpha1{Fake: &c.Fake}
+// ConsoleV1alpha1 retrieves the ConsoleV1alpha1Client
+func (c *Clientset) ConsoleV1alpha1() consolev1alpha1.ConsoleV1alpha1Interface {
+	return &fakeconsolev1alpha1.FakeConsoleV1alpha1{Fake: &c.Fake}
 }
 
-// Exampleoperator retrieves the ExampleoperatorV1alpha1Client
-func (c *Clientset) Exampleoperator() exampleoperatorv1alpha1.ExampleoperatorV1alpha1Interface {
-	return &fakeexampleoperatorv1alpha1.FakeExampleoperatorV1alpha1{Fake: &c.Fake}
+// Console retrieves the ConsoleV1alpha1Client
+func (c *Clientset) Console() consolev1alpha1.ConsoleV1alpha1Interface {
+	return &fakeconsolev1alpha1.FakeConsoleV1alpha1{Fake: &c.Fake}
 }

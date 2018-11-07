@@ -1,4 +1,4 @@
-package: github.com/enj/example-operator
+package: github.com/enj/console-operator
 import:
 
 # kube

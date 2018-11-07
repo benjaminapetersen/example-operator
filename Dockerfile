@@ -1,6 +1,6 @@
-# This is an example operator.
+# This is an console operator.
 #
-# The standard name for its image is enj/example-operator
+# The standard name for its image is enj/console-operator
 #
 FROM openshift/origin-release:golang-1.10
 COPY . /go/src/github.com/enj/example-operator

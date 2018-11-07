@@ -7,9 +7,9 @@ import (
 	sync "sync"
 	time "time"
 
-	versioned "github.com/enj/example-operator/pkg/generated/clientset/versioned"
-	example "github.com/enj/example-operator/pkg/generated/informers/externalversions/example"
-	internalinterfaces "github.com/enj/example-operator/pkg/generated/informers/externalversions/internalinterfaces"
+	versioned "github.com/openshift/console-operator/pkg/generated/clientset/versioned"
+	console "github.com/openshift/console-operator/pkg/generated/informers/externalversions/console"
+	internalinterfaces "github.com/openshift/console-operator/pkg/generated/informers/externalversions/internalinterfaces"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -156,9 +156,9 @@ type SharedInformerFactory interface {
 	ForResource(resource schema.GroupVersionResource) (GenericInformer, error)
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
-	Exampleoperator() example.Interface
+	Console() console.Interface
 }
 
-func (f *sharedInformerFactory) Exampleoperator() example.Interface {
-	return example.New(f, f.namespace, f.tweakListOptions)
+func (f *sharedInformerFactory) Console() console.Interface {
+	return console.New(f, f.namespace, f.tweakListOptions)
 }

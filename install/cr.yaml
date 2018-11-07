@@ -1,9 +1,36 @@
-apiVersion: exampleoperator.crd.monis.app/v1alpha1
-kind: ExampleOperator
+apiVersion: console.openshift.io/v1alpha1
+kind: Console
 metadata:
-  name: example-operator-resource
-  namespace: example-operator
+  name: console-operator-resource
+  namespace: openshift-console
 spec:
   managementState: Managed
   version: 3.10.0
-  value: panda
+  value: this-is-actually-a-key-with-a-random-bytes-value
+  count: 1
+  logging:
+    level: 0
+
+# this is the old one.
+# remove soon.
+#
+## The console-operator will create a console automatically on startup if one does not exist.
+## This file is an example of a console resource.
+## You may edit this file and `oc apply -f cr.yaml` to make changes to the console.
+#apiVersion: "console.openshift.io/v1alpha1"
+#kind: "Console"
+#metadata:
+#  # Do not change the name, the operator explicitly requires this name to match as the console is a singleton.
+#  name: openshift-console
+#  namespace: openshift-console
+#spec:
+#  # openshift/api/operator/v1alpha1/types.go
+#  # managementState indicates whether the operator is:
+#  # - Managed indicates the operator fully manages the state of the console and its sub-resources
+#  # - Unmanaged indicates that the operator should idle and ignore the console and its sub-resources
+#  # - Removed indicates that the operator should delete all of the sub-resources of the console
+#  managementState: Managed
+#  # there should be only one console at this time
+#  count: 1
+#  logging:
+#    level: 0
