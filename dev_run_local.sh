@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-
-echo "login as system:admin to install...."
+# we need to be system admin to install these
+oc login -u system:admin
 
 # this just deploys everything under /manifests,
 # but tries to space them out a bit to avoid errors.
@@ -57,7 +57,11 @@ done
 
 sleep 1
 
-echo "did you 'make build' the latest binary?"
+# at this point, we should no longer be system:admin
+# oc login -u developer -p 12345
+
+# ensure the latest binary has been built
+make build
 
 # Don't deploy the operator in `manifests`
 # instead, we will instantiate the operator locally
