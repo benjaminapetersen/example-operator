@@ -12,10 +12,17 @@ import (
 
 func NewOperator() *cobra.Command {
 	cmd := controllercmd.
-		NewControllerCommandConfig("console-operator", version.Get(), starter.RunOperator).
+		NewControllerCommandConfig(
+			"console-operator",
+			version.Get(),
+			starter.RunOperator).
 		NewCommand()
 	cmd.Use = "operator"
 	cmd.Short = "Start the Console Operator"
-
+	// TODO: better docs on this
+	// should probably give example usage, etc
+	// https://github.com/spf13/cobra#create-rootcmd
+	cmd.Long = `An Operator for a web console for OpenShift.
+				`
 	return cmd
 }
