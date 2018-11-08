@@ -1,6 +1,6 @@
 # Console Operator
 
-An operator for OpenShift Console built using the operator-sdk.
+An operator for OpenShift Console.
 
 The console-operator installs and maintains the web console on a cluster.
 
@@ -71,7 +71,6 @@ Check for the existence of expected resources:
 oc get console 
 # etc
 ```
-
 
 Explanation:
 
