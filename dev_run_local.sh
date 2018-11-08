@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+
+echo "login as system:admin to install...."
+
 # this just deploys everything under /manifests,
 # but tries to space them out a bit to avoid errors.
 # in the end, it creates a custom resource to kick
@@ -53,6 +56,8 @@ do
 done
 
 sleep 1
+
+echo "did you 'make build' the latest binary?"
 
 # Don't deploy the operator in `manifests`
 # instead, we will instantiate the operator locally
