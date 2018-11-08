@@ -7,42 +7,42 @@
 
 FILE=examples/cr.yaml
 echo "creating ${FILE}"
-oc create -f $FILE
+oc delete -f $FILE
 
 for FILE in `find ./manifests -name '05-*'`
 do
   echo "deleting ${FILE}"
-  oc create -f $FILE
+  oc delete -f $FILE
 done
 
 for FILE in `find ./manifests -name '04-*'`
 do
   echo "deleting ${FILE}"
-  oc create -f $FILE
+  oc delete -f $FILE
 done
 
 for FILE in `find ./manifests -name '03-*'`
 do
   echo "deleting ${FILE}"
-  oc create -f $FILE
+  oc delete -f $FILE
 done
 
 for FILE in `find ./manifests -name '02-*'`
 do
   echo "deleting ${FILE}"
-  oc create -f $FILE
+  oc delete -f $FILE
 done
 
 for FILE in `find ./manifests -name '01-*'`
 do
   echo "deleting ${FILE}"
-  oc create -f $FILE
+  oc delete -f $FILE
 done
 
 for FILE in `find ./manifests -name '00-*'`
 do
   echo "deleting ${FILE}"
-  oc create -f $FILE
+  oc delete -f $FILE
 done
 
 
