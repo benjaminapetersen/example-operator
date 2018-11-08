@@ -14,6 +14,9 @@ var (
 )
 
 func NewVersion() *cobra.Command {
+	// TODO:
+	// update & use the pkg/version/version.go to pull
+	// git information & present here.
 	cmd := &cobra.Command{
 		Use: "version",
 		Short: "Display the Operator Version",
