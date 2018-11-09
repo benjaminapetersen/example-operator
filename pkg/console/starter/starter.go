@@ -6,34 +6,35 @@ import (
 
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
+	// "k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
 	"github.com/openshift/library-go/pkg/operator/status"
+
+	// clients
+	routesclient "github.com/openshift/client-go/route/clientset/versioned"
+	authclient "github.com/openshift/client-go/oauth/clientset/versioned"
+	"github.com/openshift/console-operator/pkg/generated/clientset/versioned"
+	// informers
+	oauthinformers "github.com/openshift/client-go/oauth/informers/externalversions"
+	routesinformers "github.com/openshift/client-go/route/informers/externalversions"
+	"github.com/openshift/console-operator/pkg/generated/informers/externalversions"
+
 	operatorv1alpha1 "github.com/openshift/api/operator/v1alpha1"
 	"github.com/openshift/console-operator/pkg/console/operator"
-	"github.com/openshift/console-operator/pkg/generated/clientset/versioned"
-	"github.com/openshift/console-operator/pkg/generated/informers/externalversions"
 )
 
 
-// Time to wire up our informers/clients/etc
-//
-// informers
-// - listen for changes
-//
-// clients
-// - used by informers to get,list,put resources
-//
-// informers
-// - instantiated in starter.go (here)
-// - consumed in... places.
 func RunOperator(clientConfig *rest.Config, stopCh <-chan struct{}) error {
 
-	fmt.Printf("starter.go -> RunOperator() func........\n")
+	// only for the ClusterStatus, everything else has a specific client
+	dynamicClient, err := dynamic.NewForConfig(clientConfig)
+	if err != nil {
+		return err
+	}
 
 	// creates a new kube clientset
 	// clientConfig is a REST config
@@ -51,13 +52,24 @@ func RunOperator(clientConfig *rest.Config, stopCh <-chan struct{}) error {
 		return err
 	}
 
+	routesClient, err := routesclient.NewForConfig(clientConfig)
+	if err != nil {
+		return err
+	}
+
+	oauthClient, err := authclient.NewForConfig(clientConfig)
+	if err != nil {
+		return err
+	}
+
 	const resync = 10 * time.Minute
 
-	// only watch a specific resource name
-	// this is an optimization step that is not initially needed
-	// TODO: eliminate for now?
+	// NOOP for now
+	// TODO: can perhaps put this back the way it was, but may
+	// need to create a couple different version for
+	// resources w/different names
 	tweakListOptions := func(options *v1.ListOptions) {
-		options.FieldSelector = fields.OneTermEqualSelector("metadata.name", operator.ResourceName).String()
+		// options.FieldSelector = fields.OneTermEqualSelector("metadata.name", operator.ResourceName).String()
 	}
 
 	kubeInformersNamespaced := informers.NewSharedInformerFactoryWithOptions(
@@ -79,39 +91,47 @@ func RunOperator(clientConfig *rest.Config, stopCh <-chan struct{}) error {
 		externalversions.WithTweakListOptions(tweakListOptions),
 	)
 
+	routesInformersNamespaced := routesinformers.NewSharedInformerFactoryWithOptions(
+		routesClient,
+		resync,
+		routesinformers.WithNamespace(operator.TargetNamespace),
+		routesinformers.WithTweakListOptions(tweakListOptions),
+	)
+
+	// oauthclients are not namespaced
+	oauthInformers := oauthinformers.NewSharedInformerFactoryWithOptions(
+		oauthClient,
+		resync,
+		oauthinformers.WithTweakListOptions(tweakListOptions),
+	)
+
 	consoleOperator := operator.NewConsoleOperator(
-		// informer factory, drilling down to the v1alpha1 console informer
-		consoleOperatorInformers.Console().V1alpha1().Consoles(),
-		// specifically secrets, we can add more here.
-		kubeInformersNamespaced.Core().V1().Secrets(),
-		// client and informer are NOT the same
+		// informers
+		consoleOperatorInformers.Console().V1alpha1().Consoles(), // Console
+		kubeInformersNamespaced.Core().V1(), // Secrets, ConfigMaps, Service
+		kubeInformersNamespaced.Apps().V1(), // Deployments
+		routesInformersNamespaced.Route().V1(), // Route
+		oauthInformers.Oauth().V1(), // oauth
+		// clients
 		consoleOperatorClient.ConsoleV1alpha1().Consoles(operator.TargetNamespace),
-		// client and informer are NOT the same
-		kubeClient.CoreV1(),
+		kubeClient.CoreV1(), // Secrets, ConfigMaps, Service
+		kubeClient.AppsV1(),
+		routesClient.RouteV1(),
+		oauthClient.OauthV1(),
 	)
 
 	kubeInformersNamespaced.Start(stopCh)
 	consoleOperatorInformers.Start(stopCh)
+	routesInformersNamespaced.Start(stopCh)
+	oauthInformers.Start(stopCh)
 
 	go consoleOperator.Run(stopCh)
 
-	// prob move this up...
-	dynamicClient, err := dynamic.NewForConfig(clientConfig)
-	if err != nil {
-		return err
-	}
 
-	// TODO: create the status  here....
-	// to test this, will need to update STATUS on my CR
-	// and then check and see if it is updated on the other deal.
-	// TODO: install this, from the old console-operator install  operatorstatus.openshift.io
 	clusterOperatorStatus := status.NewClusterOperatorStatusController(
-		// TODO: these may not be exactly right...
-		// make sure they are what we actually need.
 		operator.TargetNamespace,
 		operator.ResourceName,
-		// for some reason we need a dynamic client.  this is weird, and i dont know why
-		// given that we rant about "real" strongly typed clients constantly.
+		// no idea why this is dynamic & not a strongly typed client.
 		dynamicClient,
 		&operatorStatusProvider{informers: consoleOperatorInformers},
 	)
@@ -124,8 +144,7 @@ func RunOperator(clientConfig *rest.Config, stopCh <-chan struct{}) error {
 }
 
 
-// NOTE: i want this in a separate package,
-// but most other operators seem to keep it here :/
+// I'd prefer this in a /console/status/ package, but other operators keep it here.
 type operatorStatusProvider struct {
 	informers externalversions.SharedInformerFactory
 }
