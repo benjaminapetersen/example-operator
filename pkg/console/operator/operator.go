@@ -30,6 +30,7 @@ import (
 	oauthclientv1 "github.com/openshift/client-go/oauth/clientset/versioned/typed/oauth/v1"
 	// operator
 	"github.com/openshift/console-operator/pkg/controller"
+	consolev1alpha1 "github.com/openshift/console-operator/pkg/apis/console/v1alpha1"
 )
 
 const (
@@ -38,11 +39,19 @@ const (
 
 	// ResourceName could be made configurable if desired
 	// all resources share the same name to make it easier to reason about and to configure single item watches
+	// NOTE: this must match metadata.name in the CR.yaml else the CR will be ignored
 	ResourceName = "console-operator-resource"
 
 	// workQueueKey is the singleton key shared by all events
 	// the value is irrelevant
-	workQueueKey = "key"
+	workQueueKey = "console-operator-queue-key"
+)
+
+// consts to maintain existing names of various sub-resources
+const (
+	OpenShiftConsoleName      = "openshift-console"
+	OpenShiftConsoleShortName = "console"
+	OpenShiftConsoleNamespace = "openshift-console"
 )
 
 // func NewConsoleOperator(
@@ -153,30 +162,32 @@ func (c *ConsoleOperator) sync(_ interface{}) error {
 	// we ignore the passed in key because it will always be workQueueKey
 	// it does not matter how the sync loop was triggered
 	// all we need to worry about is reconciling the state back to what we expect
+	operatorConfig, err := c.operatorClient.Get(ResourceName, metav1.GetOptions{})
 
-	config, err := c.operatorClient.Get(ResourceName, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		_, err := c.operatorClient.Create(c.defaultConsole())
+		return err
+	}
 	if err != nil {
 		return err
 	}
 
-	switch config.Spec.ManagementState {
+	switch operatorConfig.Spec.ManagementState {
 	case operatorsv1alpha1.Managed:
 		// handled below
-
 	case operatorsv1alpha1.Unmanaged:
 		return nil
-
 	case operatorsv1alpha1.Removed:
 		return utilerrors.FilterOut(c.secretsClient.Secrets(TargetNamespace).Delete(ResourceName, nil), errors.IsNotFound)
-
 	default:
 		// TODO should update status
-		return fmt.Errorf("unknown state: %v", config.Spec.ManagementState)
+		return fmt.Errorf("unknown state: %v", operatorConfig.Spec.ManagementState)
 	}
 
 	var currentActualVerion *semver.Version
 
-	if ca := config.Status.CurrentAvailability; ca != nil {
+	// TODO: ca.yaml needs a version, update the v1alpha1.Console to include version field
+	if ca := operatorConfig.Status.CurrentAvailability; ca != nil {
 		ver, err := semver.Parse(ca.Version)
 		if err != nil {
 			utilruntime.HandleError(err)
@@ -184,18 +195,34 @@ func (c *ConsoleOperator) sync(_ interface{}) error {
 			currentActualVerion = &ver
 		}
 	}
-	desiredVersion, err := semver.Parse(config.Spec.Version)
+	desiredVersion, err := semver.Parse(operatorConfig.Spec.Version)
 	if err != nil {
 		// TODO report failing status, we may actually attempt to do this in the "normal" error handling
 		return err
 	}
-
 	v310_00_to_unknown := versioning.NewRangeOrDie("3.10.0", "3.10.1")
 
-	outConfig := config.DeepCopy()
+	outConfig := operatorConfig.DeepCopy()
 	var errs []error
 
+
+	fmt.Println("[Version]")
+	fmt.Printf("Current version: %v, Desired version: %v \n", currentActualVerion, desiredVersion)
+	fmt.Printf("Between or empty? %v, between? %v", v310_00_to_unknown.BetweenOrEmpty(currentActualVerion), v310_00_to_unknown.Between(&desiredVersion))
+	fmt.Println("-------------")
+
 	switch {
+	// TODO: 
+	// Essentially currentActualVersion & desiredVersion matches
+	// our current version is <nil> so it triggers this block.
+	// once we put a version (4.0.0) it will no longer trigger this block.
+	// we need an actual v4
+	// so
+	// case is_v400
+	//   reconcile v400
+	// case is_v311_but_upgrading
+	//   upgrade v400
+	// etc.
 	case v310_00_to_unknown.BetweenOrEmpty(currentActualVerion) && v310_00_to_unknown.Between(&desiredVersion):
 		_, _, err := resourceapply.ApplySecret(c.secretsClient, &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -203,7 +230,7 @@ func (c *ConsoleOperator) sync(_ interface{}) error {
 				Namespace: TargetNamespace,
 			},
 			Data: map[string][]byte{
-				config.Spec.Value: []byte("007"),
+				operatorConfig.Spec.Value: []byte("007"),
 			},
 		})
 		errs = append(errs, err)
@@ -225,3 +252,23 @@ func (c *ConsoleOperator) sync(_ interface{}) error {
 
 	return utilerrors.NewAggregate(errs)
 }
+
+
+func (c *ConsoleOperator) defaultConsole() *consolev1alpha1.Console {
+	return &consolev1alpha1.Console{
+		ObjectMeta: metav1.ObjectMeta{
+			// Name: OpenShiftConsoleName,
+			Name: ResourceName,
+			Namespace: OpenShiftConsoleNamespace,
+		},
+		Spec: consolev1alpha1.ConsoleSpec{
+			OperatorSpec: operatorsv1alpha1.OperatorSpec{
+				ManagementState: "Managed",
+			},
+		},
+	}
+}
+
+
+
+
