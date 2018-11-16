@@ -2,63 +2,44 @@ package operator
 
 import (
 	"fmt"
+	"github.com/openshift/console-operator/pkg/controller"
 
 	"github.com/blang/semver"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/informers/core/v1"
-	coreclientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
+	coreclientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
 	operatorsv1alpha1 "github.com/openshift/api/operator/v1alpha1"
-	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	oauthclientv1 "github.com/openshift/client-go/oauth/clientset/versioned/typed/oauth/v1"
+	oauthinformersv1 "github.com/openshift/client-go/oauth/informers/externalversions/oauth/v1"
+	routeclientv1 "github.com/openshift/client-go/route/clientset/versioned/typed/route/v1"
 	"github.com/openshift/library-go/pkg/operator/versioning"
 	// informers
 	routesinformersv1 "github.com/openshift/client-go/route/informers/externalversions/route/v1"
-	appsinformersv1 "k8s.io/client-go/informers/apps/v1"
-	oauthinformersv1 "github.com/openshift/client-go/oauth/informers/externalversions/oauth/v1"
+	consolev1alpha1 "github.com/openshift/console-operator/pkg/apis/console/v1alpha1"
 	consoleinformers "github.com/openshift/console-operator/pkg/generated/informers/externalversions/console/v1alpha1"
+	appsinformersv1 "k8s.io/client-go/informers/apps/v1"
 	// clients
 	"github.com/openshift/console-operator/pkg/generated/clientset/versioned/typed/console/v1alpha1"
-	routeclientv1 "github.com/openshift/client-go/route/clientset/versioned/typed/route/v1"
-	oauthclientv1 "github.com/openshift/client-go/oauth/clientset/versioned/typed/oauth/v1"
-	// operator
-	"github.com/openshift/console-operator/pkg/controller"
-	consolev1alpha1 "github.com/openshift/console-operator/pkg/apis/console/v1alpha1"
 )
 
 const (
-	// TargetNamespace could be made configurable if desired
-	TargetNamespace = "openshift-console"
-
-	// ResourceName could be made configurable if desired
-	// all resources share the same name to make it easier to reason about and to configure single item watches
-	// NOTE: this must match metadata.name in the CR.yaml else the CR will be ignored
-	ResourceName = "console-operator-resource"
-
 	// workQueueKey is the singleton key shared by all events
 	// the value is irrelevant
 	workQueueKey = "console-operator-queue-key"
+	controllerName = "Console"
 )
 
-// consts to maintain existing names of various sub-resources
-const (
-	OpenShiftConsoleName      = "openshift-console"
-	OpenShiftConsoleShortName = "console"
-	OpenShiftConsoleNamespace = "openshift-console"
-)
 
-// func NewConsoleOperator(
-// 	coi consoleinformers.ConsoleOperatorInformer,
-// 	si v1.SecretInformer,
-// 	operatorClient v1alpha1.ConsoleOperatorInterface,
-// 	secretsClient coreclientv1.SecretsGetter) *ConsoleOperator {
+// the ConsoleOperator uses specific, strongly-typed clients
+// for each resource that it interacts with.
 func NewConsoleOperator(
 	// informers
 	coi consoleinformers.ConsoleInformer,
@@ -98,7 +79,7 @@ func NewConsoleOperator(
 	// we do not really need to wait for our informers to sync since we only watch a single resource
 	// and make live reads but it does not hurt anything and guarantees we have the correct behavior
 	internalController, queue := controller.New(
-		"Console",
+		controllerName,
 		c.sync,
 		operatorInformer.HasSynced,
 		secretsInformer.HasSynced,
@@ -158,11 +139,12 @@ func (c *ConsoleOperator) Run(stopCh <-chan struct{}) {
 
 // sync() is the handler() function equivalent from the sdk
 // this is the big switch statement.
+// TODO: clean this up a bit, its messy
 func (c *ConsoleOperator) sync(_ interface{}) error {
 	// we ignore the passed in key because it will always be workQueueKey
 	// it does not matter how the sync loop was triggered
 	// all we need to worry about is reconciling the state back to what we expect
-	operatorConfig, err := c.operatorClient.Get(ResourceName, metav1.GetOptions{})
+	operatorConfig, err := c.operatorClient.Get(controller.ResourceName, metav1.GetOptions{})
 
 	if errors.IsNotFound(err) {
 		_, err := c.operatorClient.Create(c.defaultConsole())
@@ -178,7 +160,7 @@ func (c *ConsoleOperator) sync(_ interface{}) error {
 	case operatorsv1alpha1.Unmanaged:
 		return nil
 	case operatorsv1alpha1.Removed:
-		return utilerrors.FilterOut(c.secretsClient.Secrets(TargetNamespace).Delete(ResourceName, nil), errors.IsNotFound)
+		return utilerrors.FilterOut(c.secretsClient.Secrets(controller.TargetNamespace).Delete(controller.ResourceName, nil), errors.IsNotFound)
 	default:
 		// TODO should update status
 		return fmt.Errorf("unknown state: %v", operatorConfig.Spec.ManagementState)
@@ -200,49 +182,48 @@ func (c *ConsoleOperator) sync(_ interface{}) error {
 		// TODO report failing status, we may actually attempt to do this in the "normal" error handling
 		return err
 	}
-	v310_00_to_unknown := versioning.NewRangeOrDie("3.10.0", "3.10.1")
+
+	// v310_00_to_unknown := versioning.NewRangeOrDie("3.10.0", "3.10.1")
+	v400 := versioning.NewRangeOrDie("4.0.0", "4.0.0")
 
 	outConfig := operatorConfig.DeepCopy()
 	var errs []error
 
-
-	fmt.Println("[Version]")
-	fmt.Printf("Current version: %v, Desired version: %v \n", currentActualVerion, desiredVersion)
-	fmt.Printf("Between or empty? %v, between? %v", v310_00_to_unknown.BetweenOrEmpty(currentActualVerion), v310_00_to_unknown.Between(&desiredVersion))
-	fmt.Println("-------------")
-
 	switch {
-	// TODO: 
-	// Essentially currentActualVersion & desiredVersion matches
-	// our current version is <nil> so it triggers this block.
-	// once we put a version (4.0.0) it will no longer trigger this block.
-	// we need an actual v4
-	// so
-	// case is_v400
-	//   reconcile v400
-	// case is_v311_but_upgrading
-	//   upgrade v400
-	// etc.
-	case v310_00_to_unknown.BetweenOrEmpty(currentActualVerion) && v310_00_to_unknown.Between(&desiredVersion):
-		_, _, err := resourceapply.ApplySecret(c.secretsClient, &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      ResourceName,
-				Namespace: TargetNamespace,
-			},
-			Data: map[string][]byte{
-				operatorConfig.Spec.Value: []byte("007"),
-			},
-		})
-		errs = append(errs, err)
-
-		if err == nil { // this needs work, but good enough for now
-			outConfig.Status.TaskSummary = "sync-[3.10.0,3.10.1)"
-			outConfig.Status.CurrentAvailability = &operatorsv1alpha1.VersionAvailability{
-				Version: desiredVersion.String(),
-			}
+	// v4.0.0 or nil
+	case v400.BetweenOrEmpty(currentActualVerion):
+		fmt.Println("--- must be a 4.0.0")
+		sync_v400(c, operatorConfig)
+		// errs = append(errs, err)
+		// if err == nil {
+		outConfig.Status.TaskSummary = "sync-4.0.0"
+		outConfig.Status.CurrentAvailability = &operatorsv1alpha1.VersionAvailability{
+			Version: desiredVersion.String(),
 		}
 
+	//case v310_00_to_unknown.BetweenOrEmpty(currentActualVerion) && v310_00_to_unknown.Between(&desiredVersion):
+	//	fmt.Println("---- v310_00_to_stuff")
+	//
+	//	_, _, err := resourceapply.ApplySecret(c.secretsClient, &corev1.Secret{
+	//		ObjectMeta: metav1.ObjectMeta{
+	//			Name:      ResourceName,
+	//			Namespace: TargetNamespace,
+	//		},
+	//		Data: map[string][]byte{
+	//			operatorConfig.Spec.Value: []byte("007"),
+	//		},
+	//	})
+	//	errs = append(errs, err)
+	//
+	//	if err == nil { // this needs work, but good enough for now
+	//		outConfig.Status.TaskSummary = "sync-[3.10.0,3.10.1)"
+	//		outConfig.Status.CurrentAvailability = &operatorsv1alpha1.VersionAvailability{
+	//			Version: desiredVersion.String(),
+	//		}
+	//	}
+
 	default:
+		fmt.Println("Unrecognized version")
 		outConfig.Status.TaskSummary = "unrecognized"
 	}
 
@@ -257,13 +238,13 @@ func (c *ConsoleOperator) sync(_ interface{}) error {
 func (c *ConsoleOperator) defaultConsole() *consolev1alpha1.Console {
 	return &consolev1alpha1.Console{
 		ObjectMeta: metav1.ObjectMeta{
-			// Name: OpenShiftConsoleName,
-			Name: ResourceName,
-			Namespace: OpenShiftConsoleNamespace,
+				Name:      controller.ResourceName,
+			Namespace: controller.OpenShiftConsoleNamespace,
 		},
 		Spec: consolev1alpha1.ConsoleSpec{
 			OperatorSpec: operatorsv1alpha1.OperatorSpec{
 				ManagementState: "Managed",
+				Version: "4.0.0",
 			},
 		},
 	}

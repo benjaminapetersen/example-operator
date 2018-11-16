@@ -19,8 +19,10 @@ type Console struct {
 
 type ConsoleSpec struct {
 	v1alpha1.OperatorSpec
-
+	// TODO: delete this, its no longer needed
 	Value string `json:"value,omitempty"`
+	// Count is the number of Console replicas
+	Count int32 `json:"count,omitempty"`
 }
 
 type ConsoleStatus struct {

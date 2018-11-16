@@ -2,10 +2,11 @@ package starter
 
 import (
 	"fmt"
+	"github.com/openshift/console-operator/pkg/controller"
 	"time"
 
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/cache"
 	// "k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
@@ -14,9 +15,9 @@ import (
 
 	"github.com/openshift/library-go/pkg/operator/status"
 
+	authclient "github.com/openshift/client-go/oauth/clientset/versioned"
 	// clients
 	routesclient "github.com/openshift/client-go/route/clientset/versioned"
-	authclient "github.com/openshift/client-go/oauth/clientset/versioned"
 	"github.com/openshift/console-operator/pkg/generated/clientset/versioned"
 	// informers
 	oauthinformers "github.com/openshift/client-go/oauth/informers/externalversions"
@@ -78,7 +79,7 @@ func RunOperator(clientConfig *rest.Config, stopCh <-chan struct{}) error {
 		resync,
 		// takes an unlimited number of additional "options" arguments, which are functions,
 		// that take a sharedInformerFactory and return a sharedInformerFactory
-		informers.WithNamespace(operator.TargetNamespace),
+		informers.WithNamespace(controller.TargetNamespace),
 		informers.WithTweakListOptions(tweakListOptions),
 	)
 
@@ -87,14 +88,14 @@ func RunOperator(clientConfig *rest.Config, stopCh <-chan struct{}) error {
 		consoleOperatorClient,
 		resync,
 		// and the same set of optional transform functions
-		externalversions.WithNamespace(operator.TargetNamespace),
+		externalversions.WithNamespace(controller.TargetNamespace),
 		externalversions.WithTweakListOptions(tweakListOptions),
 	)
 
 	routesInformersNamespaced := routesinformers.NewSharedInformerFactoryWithOptions(
 		routesClient,
 		resync,
-		routesinformers.WithNamespace(operator.TargetNamespace),
+		routesinformers.WithNamespace(controller.TargetNamespace),
 		routesinformers.WithTweakListOptions(tweakListOptions),
 	)
 
@@ -113,7 +114,7 @@ func RunOperator(clientConfig *rest.Config, stopCh <-chan struct{}) error {
 		routesInformersNamespaced.Route().V1(), // Route
 		oauthInformers.Oauth().V1(), // oauth
 		// clients
-		consoleOperatorClient.ConsoleV1alpha1().Consoles(operator.TargetNamespace),
+		consoleOperatorClient.ConsoleV1alpha1().Consoles(controller.TargetNamespace),
 		kubeClient.CoreV1(), // Secrets, ConfigMaps, Service
 		kubeClient.AppsV1(),
 		routesClient.RouteV1(),
@@ -129,8 +130,8 @@ func RunOperator(clientConfig *rest.Config, stopCh <-chan struct{}) error {
 
 
 	clusterOperatorStatus := status.NewClusterOperatorStatusController(
-		operator.TargetNamespace,
-		operator.ResourceName,
+		controller.TargetNamespace,
+		controller.ResourceName,
 		// no idea why this is dynamic & not a strongly typed client.
 		dynamicClient,
 		&operatorStatusProvider{informers: consoleOperatorInformers},
@@ -154,7 +155,7 @@ func (p *operatorStatusProvider) Informer() cache.SharedIndexInformer {
 }
 
 func (p *operatorStatusProvider) CurrentStatus() (operatorv1alpha1.OperatorStatus, error) {
-	instance, err := p.informers.Console().V1alpha1().Consoles().Lister().Consoles(operator.TargetNamespace).Get(operator.ResourceName)
+	instance, err := p.informers.Console().V1alpha1().Consoles().Lister().Consoles(controller.TargetNamespace).Get(controller.ResourceName)
 	if err != nil {
 		return operatorv1alpha1.OperatorStatus{}, err
 	}

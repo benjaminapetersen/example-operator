@@ -12,6 +12,11 @@ The console operator is installed by default and will automatically maintain a c
 
 * Install Go -- https://golang.org/doc/install
 
+
+<!-- 
+TODO: create the gopaths/path/to/here setup
+-->
+
 ## Development on a < 4.0.0 cluster 
 
 If using `oc cluster up` on a `< 4.0.0` cluster you will need the `--public-hostname` flag 
