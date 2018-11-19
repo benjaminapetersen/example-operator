@@ -5,6 +5,9 @@
 # in the end, it creates a custom resource to kick
 # the operator into action
 
+echo "DEPLOYING REMOTE OPERATOR"
+echo "(This does not build locally, nor does it push the image to dockerhub...)"
+
 for FILE in `find ./manifests -name '00-*'`
 do
     echo "creating ${FILE}"

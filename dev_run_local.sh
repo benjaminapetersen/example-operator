@@ -33,6 +33,11 @@ done
 
 sleep 2
 
+# use the openshift-console project, for
+#  - when we create the CR (namespace: should be defined in the resource anyway)
+#  - when we run the operator locally.
+oc project 'openshift-console'
+
 for FILE in `find ./manifests -name '02-*'`
 do
   echo "creating ${FILE}"
@@ -71,6 +76,10 @@ make build
 #  echo "creating ${FILE}"
 #  oc create -f $FILE
 #done
+
+# temporaily add the binary to path so we can call it below
+export PATH="$PATH:$HOME/gopaths/consoleoperator/src/github.com/openshift/console-operator/_output/local/bin/darwin/amd64"
+
 IMAGE=docker.io/openshift/origin-console:latest \
     console operator \
     --kubeconfig $HOME/.kube/config \
@@ -78,7 +87,6 @@ IMAGE=docker.io/openshift/origin-console:latest \
     --v 4
 
 echo "TODO: support --create-default-console again!"
-
 # TODO: GET BACK TO THIS:
 #IMAGE=docker.io/openshift/origin-console:latest \
 #    console operator \
@@ -87,4 +95,7 @@ echo "TODO: support --create-default-console again!"
 #    --create-default-console \
 #    --v 4
 
+# NOT creating the CR as the operator should create one automatically.
+# echo "Creating the CR to activate the operator"
+# oc create -f "./examples/cr.yaml"
 
