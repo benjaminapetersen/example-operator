@@ -1,11 +1,12 @@
 package operator
 
 import (
+	// standard lib
 	"fmt"
-	"github.com/openshift/console-operator/pkg/controller"
-
+	// 3rd party
 	"github.com/blang/semver"
-
+	"github.com/sirupsen/logrus"
+	// kube
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -15,7 +16,8 @@ import (
 	coreclientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-
+	// openshift
+	"github.com/openshift/console-operator/pkg/controller"
 	operatorsv1alpha1 "github.com/openshift/api/operator/v1alpha1"
 	oauthclientv1 "github.com/openshift/client-go/oauth/clientset/versioned/typed/oauth/v1"
 	oauthinformersv1 "github.com/openshift/client-go/oauth/informers/externalversions/oauth/v1"
@@ -159,6 +161,7 @@ func (c *ConsoleOperator) sync(_ interface{}) error {
 		// handled below
 	case operatorsv1alpha1.Unmanaged:
 		return nil
+	// take a look @ https://github.com/openshift/service-serving-cert-signer/blob/master/pkg/operator/operator.go#L86
 	case operatorsv1alpha1.Removed:
 		return utilerrors.FilterOut(c.secretsClient.Secrets(controller.TargetNamespace).Delete(controller.ResourceName, nil), errors.IsNotFound)
 	default:
@@ -166,7 +169,7 @@ func (c *ConsoleOperator) sync(_ interface{}) error {
 		return fmt.Errorf("unknown state: %v", operatorConfig.Spec.ManagementState)
 	}
 
-	var currentActualVerion *semver.Version
+	var currentActualVersion *semver.Version
 
 	// TODO: ca.yaml needs a version, update the v1alpha1.Console to include version field
 	if ca := operatorConfig.Status.CurrentAvailability; ca != nil {
@@ -174,25 +177,26 @@ func (c *ConsoleOperator) sync(_ interface{}) error {
 		if err != nil {
 			utilruntime.HandleError(err)
 		} else {
-			currentActualVerion = &ver
+			currentActualVersion = &ver
 		}
 	}
+	// not actually using ATM
 	desiredVersion, err := semver.Parse(operatorConfig.Spec.Version)
 	if err != nil {
 		// TODO report failing status, we may actually attempt to do this in the "normal" error handling
 		return err
 	}
 
-	// v310_00_to_unknown := versioning.NewRangeOrDie("3.10.0", "3.10.1")
-	v400 := versioning.NewRangeOrDie("4.0.0", "4.0.0")
+	// this is arbitrary, but we need a placeholder. we will have to handle versioning appropriately at some point
+	v311_to_401 := versioning.NewRangeOrDie("3.11.0", "4.0.1")
 
 	outConfig := operatorConfig.DeepCopy()
 	var errs []error
 
 	switch {
 	// v4.0.0 or nil
-	case v400.BetweenOrEmpty(currentActualVerion):
-		fmt.Println("--- must be a 4.0.0")
+	case v311_to_401.BetweenOrEmpty(currentActualVersion):
+		logrus.Println("Sync-4.0.0")
 		sync_v400(c, operatorConfig)
 		// errs = append(errs, err)
 		// if err == nil {
@@ -200,30 +204,8 @@ func (c *ConsoleOperator) sync(_ interface{}) error {
 		outConfig.Status.CurrentAvailability = &operatorsv1alpha1.VersionAvailability{
 			Version: desiredVersion.String(),
 		}
-
-	//case v310_00_to_unknown.BetweenOrEmpty(currentActualVerion) && v310_00_to_unknown.Between(&desiredVersion):
-	//	fmt.Println("---- v310_00_to_stuff")
-	//
-	//	_, _, err := resourceapply.ApplySecret(c.secretsClient, &corev1.Secret{
-	//		ObjectMeta: metav1.ObjectMeta{
-	//			Name:      ResourceName,
-	//			Namespace: TargetNamespace,
-	//		},
-	//		Data: map[string][]byte{
-	//			operatorConfig.Spec.Value: []byte("007"),
-	//		},
-	//	})
-	//	errs = append(errs, err)
-	//
-	//	if err == nil { // this needs work, but good enough for now
-	//		outConfig.Status.TaskSummary = "sync-[3.10.0,3.10.1)"
-	//		outConfig.Status.CurrentAvailability = &operatorsv1alpha1.VersionAvailability{
-	//			Version: desiredVersion.String(),
-	//		}
-	//	}
-
 	default:
-		fmt.Println("Unrecognized version")
+		logrus.Printf("Unrecognized version. Desired %s, Actual %s", desiredVersion, currentActualVersion)
 		outConfig.Status.TaskSummary = "unrecognized"
 	}
 
@@ -246,6 +228,7 @@ func (c *ConsoleOperator) defaultConsole() *consolev1alpha1.Console {
 				ManagementState: "Managed",
 				Version: "4.0.0",
 			},
+			Count: 1,
 		},
 	}
 }

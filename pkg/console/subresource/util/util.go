@@ -1,6 +1,7 @@
 package util
 
 import (
+	"fmt"
 	"github.com/openshift/console-operator/pkg/apis/console/v1alpha1"
 	"github.com/openshift/console-operator/pkg/controller"
 	"github.com/sirupsen/logrus"
@@ -45,20 +46,21 @@ func SharedMeta() v1.ObjectMeta {
 func LogYaml(obj runtime.Object) {
 	// REALLY NOISY, but handy for debugging:
 	// deployJSON, err := json.Marshal(d)
-	deployYAML, err := yaml.Marshal(obj)
+	objYaml, err := yaml.Marshal(obj)
 	if err != nil {
-		logrus.Info("failed to show deployment yaml in log")
+		logrus.Info("failed to show yaml in log")
 	}
-	logrus.Infof("Deploying: %v", string(deployYAML))
+	logrus.Infof("%v", string(objYaml))
 }
 
 // objects can have more than one ownerRef, potentially
 func AddOwnerRef(obj v1.Object, ownerRef *v1.OwnerReference) {
-	if obj != nil {
-		if ownerRef != nil {
-			obj.SetOwnerReferences(append(obj.GetOwnerReferences(), *ownerRef))
-		}
-	}
+	fmt.Println("AddOwnerRef() disabled.")
+	//if obj != nil {
+	//	if ownerRef != nil {
+	//		obj.SetOwnerReferences(append(obj.GetOwnerReferences(), *ownerRef))
+	//	}
+	//}
 }
 
 func OwnerRefFrom(cr *v1alpha1.Console) *v1.OwnerReference {
