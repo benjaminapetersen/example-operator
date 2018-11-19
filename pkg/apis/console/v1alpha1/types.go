@@ -23,6 +23,11 @@ type ConsoleSpec struct {
 	Value string `json:"value,omitempty"`
 	// Count is the number of Console replicas
 	Count int32 `json:"count,omitempty"`
+	// take a look @:
+	// https://github.com/openshift/cluster-image-registry-operator/blob/master/pkg/apis/imageregistry/v1alpha1/types.go#L91-L92
+	// DefaultRoute: T|F
+	// additional routes config w/secrets
+	// Route[]
 }
 
 type ConsoleStatus struct {
