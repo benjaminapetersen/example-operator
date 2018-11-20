@@ -37,16 +37,21 @@ func DefaultConfigMap(cr *v1alpha1.Console, rt *v1.Route) *corev1.ConfigMap {
 		return nil
 	}
 	host := rt.Spec.Host
-	meta := util.SharedMeta()
-	meta.Name = ConsoleConfigMapName
 	config := NewYamlConfigString(host)
-	configMap := &corev1.ConfigMap{
-		ObjectMeta: meta,
-		Data: map[string]string{
-			consoleConfigYamlFile: config,
-		},
+	configMap := Stub()
+	configMap.Data =  map[string]string{
+		consoleConfigYamlFile: config,
 	}
 	util.AddOwnerRef(configMap, util.OwnerRefFrom(cr))
+	return configMap
+}
+
+func Stub() *corev1.ConfigMap {
+	meta := util.SharedMeta()
+	meta.Name = ConsoleConfigMapName
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: meta,
+	}
 	return configMap
 }
 

@@ -80,24 +80,30 @@ func DefaultRoute(cr *v1alpha1.Console) *routev1.Route {
 	meta := util.SharedMeta()
 	meta.Name = controller.OpenShiftConsoleShortName
 	weight := int32(100)
-	route := &routev1.Route{
-		ObjectMeta: meta,
-		Spec: routev1.RouteSpec{
-			To: routev1.RouteTargetReference{
-				Kind: "Service",
-				Name: meta.Name,
-				Weight: &weight,
-			},
-			Port: &routev1.RoutePort{
-				TargetPort: intstr.FromString("https"),
-			},
-			TLS: &routev1.TLSConfig{
-				Termination: routev1.TLSTerminationReencrypt,
-				InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
-			},
-			WildcardPolicy: routev1.WildcardPolicyNone,
+	route := Stub()
+	route.Spec = routev1.RouteSpec{
+		To: routev1.RouteTargetReference{
+			Kind: "Service",
+			Name: meta.Name,
+			Weight: &weight,
 		},
+		Port: &routev1.RoutePort{
+			TargetPort: intstr.FromString("https"),
+		},
+		TLS: &routev1.TLSConfig{
+			Termination: routev1.TLSTerminationReencrypt,
+			InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+		},
+		WildcardPolicy: routev1.WildcardPolicyNone,
 	}
 	util.AddOwnerRef(route, util.OwnerRefFrom(cr))
 	return route
+}
+
+func Stub() *routev1.Route {
+	meta := util.SharedMeta()
+	meta.Name = controller.OpenShiftConsoleShortName
+	return &routev1.Route{
+		ObjectMeta: meta,
+	}
 }

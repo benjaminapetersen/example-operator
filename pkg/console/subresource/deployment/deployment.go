@@ -92,6 +92,15 @@ func DefaultDeployment(cr *v1alpha1.Console) *appsv1.Deployment {
 	return deployment
 }
 
+func Stub() *appsv1.Deployment {
+	meta := util.SharedMeta()
+	dep := &appsv1.Deployment{
+		ObjectMeta: meta,
+	}
+	return dep
+}
+
+
 // deduplication, use the same volume config to generate Volumes, and VolumeMounts
 func consoleVolumes(vc []volumeConfig) []corev1.Volume {
 	vols := make([]corev1.Volume, len(vc))

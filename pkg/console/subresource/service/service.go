@@ -28,23 +28,34 @@ func DefaultService(cr *v1alpha1.Console) *v1.Service {
 	meta.Annotations = map[string]string{
 		ServingCertSecretAnnotation: ConsoleServingCertName,
 	}
-	service := &v1.Service{
-		ObjectMeta: meta,
-		Spec: v1.ServiceSpec{
-			Ports: []v1.ServicePort{
-				{
-					Name:       consolePortName,
-					Protocol:   v1.ProtocolTCP,
-					Port:       consolePort,
-					TargetPort: intstr.FromInt(consoleTargetPort),
-				},
+	service := Stub()
+	service.Spec = v1.ServiceSpec{
+		Ports: []v1.ServicePort{
+			{
+				Name:       consolePortName,
+				Protocol:   v1.ProtocolTCP,
+				Port:       consolePort,
+				TargetPort: intstr.FromInt(consoleTargetPort),
 			},
-			Selector:        labels,
-			Type:            "ClusterIP",
-			SessionAffinity: "None",
 		},
+		Selector:        labels,
+		Type:            "ClusterIP",
+		SessionAffinity: "None",
 	}
 
 	util.AddOwnerRef(service, util.OwnerRefFrom(cr))
 	return service
 }
+
+func Stub() *v1.Service {
+	meta := util.SharedMeta()
+	meta.Name = controller.OpenShiftConsoleShortName
+	meta.Annotations = map[string]string{
+		ServingCertSecretAnnotation: ConsoleServingCertName,
+	}
+	service := &v1.Service{
+		ObjectMeta: meta,
+	}
+	return service
+}
+

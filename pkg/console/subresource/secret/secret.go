@@ -15,24 +15,27 @@ const ClientSecretKey = "clientSecret"
 
 func DefaultSecret(cr *v1alpha1.Console, randomBits string) *corev1.Secret {
 	logrus.Printf("DefaultSecret() %v", randomBits)
+
+	secret := Stub()
+	// TODO: open bug in client-go, it drops StringData :/
+	//secret.StringData = map[string]string{
+	//	ClientSecretKey: randomBits,
+	//}
+	secret.Data = map[string][]byte{
+		ClientSecretKey: []byte(randomBits),
+	}
+
+	util.AddOwnerRef(secret, util.OwnerRefFrom(cr))
+	return secret
+}
+
+func Stub() *corev1.Secret {
 	meta := util.SharedMeta()
 	meta.Name = deployment.ConsoleOauthConfigName
 
 	secret := &corev1.Secret{
 		ObjectMeta: meta,
 	}
-
-	// TODO: open bug in client-go, it drops StringData :/
-	//secret.StringData = map[string]string{
-	//	ClientSecretKey: randomBits,
-	//}
-
-	secret.Data = map[string][]byte{
-		ClientSecretKey: []byte(randomBits),
-	}
-
-
-	util.AddOwnerRef(secret, util.OwnerRefFrom(cr))
 	return secret
 }
 

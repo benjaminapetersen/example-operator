@@ -76,13 +76,14 @@ func DeRegisterConsoleFromOAuthClient(client *oauthv1.OAuthClient) *oauthv1.OAut
 func DefaultOauthClient() *oauthv1.OAuthClient{
 	// we cannot set an ownerRef on the OAuthClient as it is
 	// a cluster scoped resource.
+	return Stub()
+}
+
+func Stub() *oauthv1.OAuthClient{
 	return &oauthv1.OAuthClient{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: controller.OpenShiftConsoleName,
 		},
-		// we can't really set these here yet but need them
-		// RedirectURIs: []string{},
-		// Secret: crypto.Random256BitsString(),
 	}
 }
 

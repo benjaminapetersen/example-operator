@@ -44,7 +44,7 @@ func sync_v400(co *ConsoleOperator, consoleConfig *v1alpha1.Console) (*v1alpha1.
 	// apply service
 	_, svcChanged, svcErr := resourceapply.ApplyService(co.serviceClient, servicesub.DefaultService(consoleConfig))
 	if svcErr != nil {
-		logrus.Errorf("service error: %v", svcErr)
+		logrus.Errorf("%q: %v \n", "service", svcErr)
 		allErrors = append(allErrors, svcErr)
 	}
 	toUpdate = toUpdate || svcChanged
@@ -53,21 +53,14 @@ func sync_v400(co *ConsoleOperator, consoleConfig *v1alpha1.Console) (*v1alpha1.
 
 	// apply route
 	// TODO:
-	// - DefaultRoute() should literally just be *Default*
-	// - get the Default().
-	//   - if exists, great. if not, Create()
-	//   - this would avoid the stomping if we use Apply() as it won't merge back...
-	// - EnsureRouteSpec()
-	//   - check that everything we need is there
-	// - ApplyRoute()
-	//   - the job of ApplyRoute() is to ensure exists, then update correctly via
-	//     merge.  This *correctly* is generic, not specific to what OUR route needs.
-	//   - therefore, it is appropriate to split apart EnsureRouteSpec() from ApplyRoute()
-	//     - note that EnsureRouteSpec() may not be great long term, depends...
+	// - once we handle a custom hostname, upgrade to ApplyRoute()
+	// - be sure to test that we don't trigger an infinite loop by stomping on the
+	//   default host name set by the server, or any other values. The ApplyRoute()
+	//   logic will have to be sound.
 	rt, rtIsNew, rtErr := routesub.GetOrCreate(co.routeClient, routesub.DefaultRoute(consoleConfig))
 	// rt, rtChanged, rtErr := routesub.ApplyRoute(co.routeClient, routesub.DefaultRoute(consoleConfig))
 	if rtErr != nil {
-		logrus.Errorf("route error: %v", rtErr)
+		logrus.Errorf("%q: %v \n", "route", rtErr)
 		allErrors = append(allErrors, rtErr)
 	}
 	toUpdate = toUpdate || rtIsNew
@@ -77,12 +70,14 @@ func sync_v400(co *ConsoleOperator, consoleConfig *v1alpha1.Console) (*v1alpha1.
 	// apply configmap (needs route)
 	_, cmChanged, cmErr := resourceapply.ApplyConfigMap(co.configMapClient, configmapsub.DefaultConfigMap(consoleConfig, rt))
 	if cmErr != nil {
-		logrus.Errorf("cm error: %v", cmErr)
+		logrus.Errorf("%q: %v \n", "configmap", cmErr)
 		allErrors = append(allErrors, cmErr)
 	}
 	toUpdate = toUpdate || cmChanged
 
-	// the deployment will need to know if the secret changed so this must be func scoped
+	// TODO: clean up the scoping here
+	// - the deployment needs to know about the change value in order to address updates,
+	//   but the wrapper is needed to avoid triggering loops unnecessarily
 	secretChanged := false
 	oauthChanged := false
 	if !secretsMatch(co.secretsClient, co.oauthClient) {
@@ -94,7 +89,7 @@ func sync_v400(co *ConsoleOperator, consoleConfig *v1alpha1.Console) (*v1alpha1.
 		defaultOauthClient := oauthsub.RegisterConsoleToOAuthClient(oauthsub.DefaultOauthClient(), rt, sharedOAuthSecretBits)
 		_, oauthChanged, oauthErr := oauthsub.ApplyOAuth(co.oauthClient, defaultOauthClient)
 		if oauthErr != nil {
-			logrus.Errorf("oauth error: %v", oauthErr)
+			logrus.Errorf("%q: %v \n", "oauthclient", oauthErr)
 			allErrors = append(allErrors, oauthErr)
 		}
 		toUpdate = toUpdate || oauthChanged
@@ -103,6 +98,7 @@ func sync_v400(co *ConsoleOperator, consoleConfig *v1alpha1.Console) (*v1alpha1.
 		_, secretChanged, secErr := resourceapply.ApplySecret(co.secretsClient, secretsub.DefaultSecret(consoleConfig, sharedOAuthSecretBits))
 		if secErr != nil {
 			logrus.Errorf("sec error: %v", secErr)
+			logrus.Errorf("%q: %v \n", "secret", secErr)
 			allErrors = append(allErrors, secErr)
 		}
 		toUpdate = toUpdate || secretChanged
@@ -123,7 +119,7 @@ func sync_v400(co *ConsoleOperator, consoleConfig *v1alpha1.Console) (*v1alpha1.
 	redeployPods := cmChanged || secretChanged
 	_, depChanged, depErr := resourceapply.ApplyDeployment(co.deploymentClient, defaultDeployment, deploymentGeneration, redeployPods)
 	if depErr != nil {
-		logrus.Infof("dep error: %v", depErr)
+		logrus.Errorf("%q: %v \n", "deployment", depErr)
 		allErrors = append(allErrors, depErr)
 	}
 	toUpdate = toUpdate || depChanged
@@ -203,20 +199,3 @@ func setStatus(cs v1alpha1.ConsoleStatus, svc *corev1.Service, rt *routev1.Route
 	}
 
 }
-
-
-//func DeleteAllResources(cr *v1alpha1.Console) error {
-//	var errs []error
-//	for _, fn := range []func(*v1alpha1.Console) error{
-//		DeleteService,
-//		DeleteRoute,
-//		DeleteConfigMap,
-//		DeleteDeployment,
-//		DeleteOAuthSecret,
-//		// we don't own it and can't create or delete it. however, we can update it
-//		NeutralizeOAuthClient,
-//	} {
-//		errs = append(errs, fn(cr))
-//	}
-//	return errutil.FilterOut(errutil.NewAggregate(errs), errors.IsNotFound)
-//}
