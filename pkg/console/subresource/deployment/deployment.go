@@ -24,8 +24,7 @@ type volumeConfig struct {
 	name     string
 	readOnly bool
 	path     string
-	// defaultMode int
-	// will be either secret or configMap
+	// isSecret or isConfigMap are mutually exclusive
 	isSecret    bool
 	isConfigMap bool
 }
@@ -36,21 +35,18 @@ var volumeConfigList = []volumeConfig{
 		readOnly: true,
 		path:     "/var/serving-cert",
 		isSecret: true,
-		// defaultMode: 288,
 	},
 	{
 		name:     ConsoleOauthConfigName,
 		readOnly: true,
 		path:     "/var/oauth-config",
 		isSecret: true,
-		// defaultMode: 288,
 	},
 	{
 		name:        "console-config",
 		readOnly:    true,
 		path:        "/var/console-config",
 		isConfigMap: true,
-		// defaultMode: 288,
 	},
 }
 

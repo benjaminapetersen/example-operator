@@ -17,7 +17,7 @@ func DefaultSecret(cr *v1alpha1.Console, randomBits string) *corev1.Secret {
 	logrus.Printf("DefaultSecret() %v", randomBits)
 
 	secret := Stub()
-	// TODO: open bug in client-go, it drops StringData :/
+	// TODO: client-go ignores the StringData field. Open a PR to fix this
 	//secret.StringData = map[string]string{
 	//	ClientSecretKey: randomBits,
 	//}

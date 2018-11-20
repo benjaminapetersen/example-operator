@@ -190,7 +190,7 @@ func (c *ConsoleOperator) sync(_ interface{}) error {
 			currentActualVersion = &ver
 		}
 	}
-	// not actually using ATM
+	// not yet using, we target only 4.0.0
 	desiredVersion, err := semver.Parse(operatorConfig.Spec.Version)
 	if err != nil {
 		// TODO report failing status, we may actually attempt to do this in the "normal" error handling
@@ -208,11 +208,12 @@ func (c *ConsoleOperator) sync(_ interface{}) error {
 	case v311_to_401.BetweenOrEmpty(currentActualVersion):
 		logrus.Println("Sync-4.0.0")
 		outConfig, err = sync_v400(c, outConfig)
-		// errs = append(errs, err)
-		// if err == nil {
-		outConfig.Status.TaskSummary = "sync-4.0.0"
-		outConfig.Status.CurrentAvailability = &operatorsv1alpha1.VersionAvailability{
-			Version: desiredVersion.String(),
+		errs = append(errs, err)
+		if err == nil {
+			outConfig.Status.TaskSummary = "sync-4.0.0"
+			outConfig.Status.CurrentAvailability = &operatorsv1alpha1.VersionAvailability{
+				Version: desiredVersion.String(),
+			}
 		}
 	default:
 		logrus.Printf("Unrecognized version. Desired %s, Actual %s", desiredVersion, currentActualVersion)
@@ -229,7 +230,6 @@ func (c *ConsoleOperator) sync(_ interface{}) error {
 // this may need to move to sync_v400 if versions ever have custom delete logic
 func (c *ConsoleOperator) deleteAllResources(cr *consolev1alpha1.Console) error {
 	var errs []error
-
 	// service
 	errs = append(errs, c.serviceClient.Services(controller.TargetNamespace).Delete(service.Stub().Name, &metav1.DeleteOptions{}))
 	// route
@@ -260,9 +260,12 @@ func (c *ConsoleOperator) defaultConsole() *consolev1alpha1.Console {
 		},
 		Spec: consolev1alpha1.ConsoleSpec{
 			OperatorSpec: operatorsv1alpha1.OperatorSpec{
+				// by default the console is managed
 				ManagementState: "Managed",
+				// if Verison is not 4.0.0 our reconcile loop will not pick it up
 				Version: "4.0.0",
 			},
+			// one replica is created
 			Count: 1,
 		},
 	}

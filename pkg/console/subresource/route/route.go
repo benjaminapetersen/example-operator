@@ -16,7 +16,8 @@ import (
 	"github.com/openshift/console-operator/pkg/controller"
 )
 
-// this is a stop gap for now.  we want ApplyRoute correct, but don't need it yet
+// We can't blindly ApplyRoute() as we need the server to annotate the
+// route.Spec.Host, so we need this func
 func GetOrCreate(client routeclient.RoutesGetter, required *routev1.Route) (*routev1.Route, bool, error) {
 	isNew := false
 	existing, err := client.Routes(required.Namespace).Get(required.Name, metav1.GetOptions{})
@@ -32,8 +33,9 @@ func GetOrCreate(client routeclient.RoutesGetter, required *routev1.Route) (*rou
 }
 
 // TODO: ApplyRoute
-// - should look like resourceapply.ApplyService
-// - should be PR'd to client-go
+// - Handle the nuance of ApplyRoute(), noting that Host and perhaps other
+//   fields are provided later by the server.  Once we know its correct,
+//   PR to library-go so it can live with the other Apply* funcs
 func ApplyRoute(client routeclient.RoutesGetter, required *routev1.Route) (*routev1.Route, bool, error) {
 	// first, get or create
 	existing, err := client.Routes(required.Namespace).Get(required.Name, metav1.GetOptions{})
@@ -48,7 +50,7 @@ func ApplyRoute(client routeclient.RoutesGetter, required *routev1.Route) (*rout
 	modified := resourcemerge.BoolPtr(false)
 	resourcemerge.EnsureObjectMeta(modified, &existing.ObjectMeta, required.ObjectMeta)
 
-	// possibly this should just be a DeepEqual on Spec...
+	// possibly this should just be a DeepEqual on Spec?
 	hostSame := equality.Semantic.DeepEqual(existing.Spec.Host, required.Spec.Host)
 	portSame := equality.Semantic.DeepEqual(existing.Spec.Port, required.Spec.Port)
 	tlsSame := equality.Semantic.DeepEqual(existing.Spec.TLS, required.Spec.TLS)

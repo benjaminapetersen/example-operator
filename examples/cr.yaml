@@ -5,6 +5,7 @@ apiVersion: "console.openshift.io/v1alpha1"
 kind: "Console"
 metadata:
   # Do not change the name, the operator explicitly requires this name to match as the console is a singleton.
+  # must match name defined in pkg/controller/api.go
   name: console-operator-resource
   namespace: openshift-console
 spec:

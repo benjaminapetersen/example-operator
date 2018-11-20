@@ -1,22 +1,21 @@
 package oauthclient
 
 import (
-	"fmt"
 	oauthv1 "github.com/openshift/api/oauth/v1"
 	"github.com/openshift/api/route/v1"
 	oauthclient "github.com/openshift/client-go/oauth/clientset/versioned/typed/oauth/v1"
+	"github.com/openshift/console-operator/pkg/console/subresource/util"
 	"github.com/openshift/console-operator/pkg/controller"
 	"github.com/openshift/console-operator/pkg/crypto"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
-	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"strings"
 )
 
 // TODO: ApplyOauth should be a generic Apply that could be used for any oauth-client
-// - should look like resourceapply.ApplyService
-// - perhaps should be PR'd to client-go
+// - should look like resourceapply.ApplyService and the other Apply funcs
+//   once its in a trustworthy state, PR to library-go so it can live with
+//   the other Apply funcs
 func ApplyOAuth(client oauthclient.OAuthClientsGetter, required *oauthv1.OAuthClient) (*oauthv1.OAuthClient, bool, error) {
 	existing, err := client.OAuthClients().Get(required.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
@@ -49,18 +48,17 @@ func RegisterConsoleToOAuthClient(client *oauthv1.OAuthClient, route *v1.Route, 
 	if route == nil {
 		return nil
 	}
-	// we should be the only ones using this client, so we can
-	// stomp all over existing RedirectURIs.
-	// TODO: potentially support multiple if multiple routes service
-	// the console
+	// we are the only application for this client
+	// in the future we may accept multiple routes
 	client.RedirectURIs = []string{}
-	client.RedirectURIs = append(client.RedirectURIs, https(route.Spec.Host))
+	client.RedirectURIs = append(client.RedirectURIs, util.HTTPS(route.Spec.Host))
 	// client.Secret = randomBits
 	client.Secret = string(randomBits)
 	return client
 }
 
 // for ManagementState.Removed
+// Console does not have create/delete priviledges on oauth clients, only update
 func DeRegisterConsoleFromOAuthClient(client *oauthv1.OAuthClient) *oauthv1.OAuthClient {
 	client.RedirectURIs = []string{}
 	// changing the string to anything else will invalidate the client
@@ -68,38 +66,17 @@ func DeRegisterConsoleFromOAuthClient(client *oauthv1.OAuthClient) *oauthv1.OAut
 	return client
 }
 
-// cr *v1alpha1.Console, rt *v1.Route
-// the OAuthClient is a cluster scoped resource that will be stamped
-// out on install by the CVO.  We know for certain we will not create
-// this, so there is no point in fleshing out its values here, unlike
-// the other resources we are responsible for.
 func DefaultOauthClient() *oauthv1.OAuthClient{
-	// we cannot set an ownerRef on the OAuthClient as it is
-	// a cluster scoped resource.
 	return Stub()
 }
 
 func Stub() *oauthv1.OAuthClient{
+	// we cannot set an ownerRef on the OAuthClient as it is cluster scoped
 	return &oauthv1.OAuthClient{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: controller.OpenShiftConsoleName,
 		},
 	}
-}
-
-// TODO: technically, this should take targetPort from route.spec.port.targetPort
-func https(host string) string {
-	protocol := "https://"
-	if host == "" {
-		logrus.Infof("host is invalid empty string")
-		return ""
-	}
-	if strings.HasPrefix(host, protocol) {
-		return host
-	}
-	secured := fmt.Sprintf("%s%s", protocol, host)
-	logrus.Infof("host updated from %s to %s", host, secured)
-	return secured
 }
 
 func GetSecretString(client *oauthv1.OAuthClient) string {

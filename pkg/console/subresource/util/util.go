@@ -9,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"os"
+	"strings"
 )
 
 func SharedLabels() map[string]string {
@@ -63,6 +64,8 @@ func AddOwnerRef(obj v1.Object, ownerRef *v1.OwnerReference) {
 	//}
 }
 
+// func RemoveOwnerRef
+
 func OwnerRefFrom(cr *v1alpha1.Console) *v1.OwnerReference {
 	if cr != nil {
 		truthy := true
@@ -82,3 +85,19 @@ func OwnerRefFrom(cr *v1alpha1.Console) *v1.OwnerReference {
 func GetImageEnv() string {
 	return os.Getenv("IMAGE")
 }
+
+// TODO: technically, this should take targetPort from route.spec.port.targetPort
+func HTTPS(host string) string {
+	protocol := "https://"
+	if host == "" {
+		logrus.Infof("util.HTTPS() cannot accept an empty string.")
+		return ""
+	}
+	if strings.HasPrefix(host, protocol) {
+		return host
+	}
+	secured := fmt.Sprintf("%s%s", protocol, host)
+	logrus.Infof("util.HTTPS(): from %s to %s", host, secured)
+	return secured
+}
+

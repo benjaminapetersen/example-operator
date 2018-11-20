@@ -6,7 +6,6 @@ import (
 	"github.com/openshift/console-operator/pkg/apis/console/v1alpha1"
 	"github.com/openshift/console-operator/pkg/console/subresource/util"
 	"github.com/openshift/console-operator/pkg/controller"
-	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -25,15 +24,10 @@ const (
 )
 
 func DefaultConfigMap(cr *v1alpha1.Console, rt *v1.Route) *corev1.ConfigMap {
+	// NOTE: this should probably just take the route.Spec.Host string.
+	// without the host, the CR should not be created, it is essential for
+	// the deployment to be created correctly.
 	if rt == nil {
-		// without a route, the configmap is useless.
-		// we should log, set the CR.status, and possibly create an Event
-		// if we can't create this. Its a big deal.
-		// (and update again once it's working)
-		// also, maybe we do get a route, but if it has no host,
-		// default or custom (or both or neither) then we need to
-		// handle cr.Status on that as well.  That can be done
-		// in context of route, not here.
 		return nil
 	}
 	host := rt.Spec.Host
@@ -95,10 +89,11 @@ func servingInfo() yaml.MapSlice {
 	}
 }
 
-// TODO: take args as we update branding based on cluster config?
 func customization() yaml.MapSlice {
 	return yaml.MapSlice{
 		{
+			// TODO: branding will need to be provided by higher level config.
+			// it should not be configurable in the CR, but needs to be configured somewhere.
 			Key: "branding", Value: brandingDefault,
 		}, {
 			Key: "documentationBaseURL", Value: documentationBaseURL,
@@ -106,7 +101,6 @@ func customization() yaml.MapSlice {
 	}
 }
 
-//// TODO: this can take args as we update locations after we generate a router
 func clusterInfo(host string) yaml.MapSlice {
 	return yaml.MapSlice{
 		{
@@ -114,9 +108,6 @@ func clusterInfo(host string) yaml.MapSlice {
 		}, {
 			Key: "consoleBasePath", Value: "",
 		},
-		// {
-		//   Key: "masterPublicURL", Value: nil,
-		// },
 	}
 
 }
@@ -125,7 +116,6 @@ func authServerYaml() yaml.MapSlice {
 	return yaml.MapSlice{
 		{
 			Key: "clientID", Value: controller.OpenShiftConsoleName,
-			// Key: "clientID", Value: OAuthClientName,
 		}, {
 			Key: "clientSecretFile", Value: clientSecretFilePath,
 		}, {
@@ -137,12 +127,7 @@ func authServerYaml() yaml.MapSlice {
 }
 
 func consoleBaseAddr(host string) string {
-	if host != "" {
-		str := fmt.Sprintf("https://%s", host)
-		logrus.Infof("console configmap base addr set to %v", str)
-		return str
-	}
-	return ""
+	return util.HTTPS(host)
 }
 
 

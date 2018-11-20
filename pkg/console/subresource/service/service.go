@@ -9,12 +9,11 @@ import (
 )
 
 const (
-	// this annotation should generate us a certificate
+	// this annotation should generate us a serving certificate
 	ServingCertSecretAnnotation = "service.alpha.openshift.io/serving-cert-secret-name"
 )
 
 const (
-	// perhaps move
 	ConsoleServingCertName = "console-serving-cert"
 	consolePortName        = "https"
 	consolePort            = 443

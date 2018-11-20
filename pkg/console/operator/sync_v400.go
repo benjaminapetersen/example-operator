@@ -29,16 +29,11 @@ import (
 	servicesub "github.com/openshift/console-operator/pkg/console/subresource/service"
 )
 
-// runs the standard v4.0.0 reconcile loop
-// the Apply logic is a bit tricky.
-// - Default Route is incomplete, we expect the server to fill out host,
-//   so should not stomp on it after the initial run
-// - other resources can be a tad tricky as well.
 func sync_v400(co *ConsoleOperator, consoleConfig *v1alpha1.Console) (*v1alpha1.Console, error) {
-	// aggregate the errors from this:
+	// aggregate
 	allErrors := []error{}
+	// track changes, may triggler ripples & update consoleConfig.Status
 	toUpdate := false
-
 
 
 	// apply service
@@ -52,11 +47,10 @@ func sync_v400(co *ConsoleOperator, consoleConfig *v1alpha1.Console) (*v1alpha1.
 
 
 	// apply route
-	// TODO:
-	// - once we handle a custom hostname, upgrade to ApplyRoute()
 	// - be sure to test that we don't trigger an infinite loop by stomping on the
 	//   default host name set by the server, or any other values. The ApplyRoute()
 	//   logic will have to be sound.
+	// - update to ApplyRoute() once the logic is settled
 	rt, rtIsNew, rtErr := routesub.GetOrCreate(co.routeClient, routesub.DefaultRoute(consoleConfig))
 	// rt, rtChanged, rtErr := routesub.ApplyRoute(co.routeClient, routesub.DefaultRoute(consoleConfig))
 	if rtErr != nil {
@@ -75,7 +69,7 @@ func sync_v400(co *ConsoleOperator, consoleConfig *v1alpha1.Console) (*v1alpha1.
 	}
 	toUpdate = toUpdate || cmChanged
 
-	// TODO: clean up the scoping here
+	// TODO: clean up, not fond of the scoping issues here
 	// - the deployment needs to know about the change value in order to address updates,
 	//   but the wrapper is needed to avoid triggering loops unnecessarily
 	secretChanged := false
@@ -105,11 +99,8 @@ func sync_v400(co *ConsoleOperator, consoleConfig *v1alpha1.Console) (*v1alpha1.
 
 	}
 
-	// TODO: deployment changes too much, dont trigger loop.
-	// the Apply() again is prob incorrect in that our DefaultDeploymnet() is
-	// too much... and there is prob something that gets stomped.
-	// apply deployment is a bit more involved as it needs information about version & if we should
-	// force a rollout of the pods.  at this point, configMap updates are the bool for this
+
+	// we don't want to thrash our deployment, but we also need to force rollout the pod whenever anything critical changes
 	defaultDeployment := deploymentsub.DefaultDeployment(consoleConfig)
 	versionAvailability := &operatorv1alpha1.VersionAvailability{
 		Version: consoleConfig.Spec.Version,
@@ -124,17 +115,16 @@ func sync_v400(co *ConsoleOperator, consoleConfig *v1alpha1.Console) (*v1alpha1.
 	}
 	toUpdate = toUpdate || depChanged
 
+	// handy debugging block
+	//logrus.Printf("service changed: %v \n", svcChanged)
+	//logrus.Printf("route is new: %v \n", rtIsNew)
+	//logrus.Printf("configMap changed: %v \n", cmChanged)
+	//logrus.Printf("secret changed: %v \n", secretChanged)
+	//logrus.Printf("oauth changed: %v \n", oauthChanged)
+	//logrus.Printf("deployment changed: %v \n", depChanged)
+	//logrus.Println("------------")
 
-
-	logrus.Printf("service changed: %v \n", svcChanged)
-	logrus.Printf("route is new: %v \n", rtIsNew)
-	logrus.Printf("configMap changed: %v \n", cmChanged)
-	logrus.Printf("secret changed: %v \n", secretChanged)
-	logrus.Printf("oauth changed: %v \n", oauthChanged)
-	logrus.Printf("deployment changed: %v \n", depChanged)
-	logrus.Println("------------")
-
-	// if any of our resources have svcChanged, we should update the CR. otherwise, skip this step.
+	// if any of our resources have changed, we should update the consoleConfig.Status. otherwise, skip this step.
 	if toUpdate {
 		logrus.Infof("Sync_v400: To update Spec? %v", toUpdate)
 		// TODO: set the status.
@@ -178,9 +168,6 @@ func secretAndOauthMatch(secret *corev1.Secret, client *oauthv1.OAuthClient) boo
 // should be automatic so long as the CR.Status is
 // properly filled out with the appropriate values.
 func setStatus(cs v1alpha1.ConsoleStatus, svc *corev1.Service, rt *routev1.Route, cm *corev1.ConfigMap, dep *appsv1.Deployment, oa *oauthv1.OAuthClient, sec *corev1.Secret) {
-	logrus.Println("setStatus()")
-	logrus.Println("-----------")
-
 	// TODO: handle custom hosts as well
 	if rt.Spec.Host != "" {
 		cs.DefaultHostName = rt.Spec.Host
