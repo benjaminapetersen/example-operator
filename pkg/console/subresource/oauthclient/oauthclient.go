@@ -55,7 +55,8 @@ func RegisterConsoleToOAuthClient(client *oauthv1.OAuthClient, route *v1.Route, 
 	// the console
 	client.RedirectURIs = []string{}
 	client.RedirectURIs = append(client.RedirectURIs, https(route.Spec.Host))
-	client.Secret = randomBits
+	// client.Secret = randomBits
+	client.Secret = string(randomBits)
 	return client
 }
 
@@ -85,6 +86,7 @@ func DefaultOauthClient() *oauthv1.OAuthClient{
 	}
 }
 
+// TODO: technically, this should take targetPort from route.spec.port.targetPort
 func https(host string) string {
 	protocol := "https://"
 	if host == "" {
@@ -97,4 +99,8 @@ func https(host string) string {
 	secured := fmt.Sprintf("%s%s", protocol, host)
 	logrus.Infof("host updated from %s to %s", host, secured)
 	return secured
+}
+
+func GetSecretString(client *oauthv1.OAuthClient) string {
+	return client.Secret
 }

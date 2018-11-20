@@ -197,7 +197,7 @@ func (c *ConsoleOperator) sync(_ interface{}) error {
 	// v4.0.0 or nil
 	case v311_to_401.BetweenOrEmpty(currentActualVersion):
 		logrus.Println("Sync-4.0.0")
-		sync_v400(c, operatorConfig)
+		outConfig, err = sync_v400(c, outConfig)
 		// errs = append(errs, err)
 		// if err == nil {
 		outConfig.Status.TaskSummary = "sync-4.0.0"

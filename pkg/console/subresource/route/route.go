@@ -1,16 +1,35 @@
 package route
 
 import (
-	routev1 "github.com/openshift/api/route/v1"
-	routeclient "github.com/openshift/client-go/route/clientset/versioned/typed/route/v1"
-	"github.com/openshift/console-operator/pkg/apis/console/v1alpha1"
-	"github.com/openshift/console-operator/pkg/console/subresource/util"
-	"github.com/openshift/console-operator/pkg/controller"
-	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
+	// kube
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	// openshift
+	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
+	routev1 "github.com/openshift/api/route/v1"
+	routeclient "github.com/openshift/client-go/route/clientset/versioned/typed/route/v1"
+	// operator
+	"github.com/openshift/console-operator/pkg/apis/console/v1alpha1"
+	"github.com/openshift/console-operator/pkg/console/subresource/util"
+	"github.com/openshift/console-operator/pkg/controller"
 )
+
+// this is a stop gap for now.  we want ApplyRoute correct, but don't need it yet
+func GetOrCreate(client routeclient.RoutesGetter, required *routev1.Route) (*routev1.Route, bool, error) {
+	isNew := false
+	existing, err := client.Routes(required.Namespace).Get(required.Name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		isNew = true
+		actual, err := client.Routes(required.Namespace).Create(required)
+		return actual, isNew, err
+	}
+	if err != nil {
+		return nil, isNew, err
+	}
+	return existing, isNew, nil
+}
 
 // TODO: ApplyRoute
 // - should look like resourceapply.ApplyService
@@ -25,11 +44,32 @@ func ApplyRoute(client routeclient.RoutesGetter, required *routev1.Route) (*rout
 	if err != nil {
 		return nil, false, err
 	}
-	// otherwise update
+
 	modified := resourcemerge.BoolPtr(false)
 	resourcemerge.EnsureObjectMeta(modified, &existing.ObjectMeta, required.ObjectMeta)
 
+	// possibly this should just be a DeepEqual on Spec...
+	hostSame := equality.Semantic.DeepEqual(existing.Spec.Host, required.Spec.Host)
+	portSame := equality.Semantic.DeepEqual(existing.Spec.Port, required.Spec.Port)
+	tlsSame := equality.Semantic.DeepEqual(existing.Spec.TLS, required.Spec.TLS)
+	targetSame := equality.Semantic.DeepEqual(existing.Spec.To, required.Spec.To)
+	wildcardSame := equality.Semantic.DeepEqual(existing.Spec.WildcardPolicy, required.Spec.WildcardPolicy)
+	// if nothing we care about changed, do nothing.  this would be good to
+	// PR to library-go and ensure we get it right
+	if hostSame && portSame && tlsSame && targetSame && wildcardSame {
+		return existing, false, nil
+	}
+
+	// TODO:
+	// - we dont want to squash host, which is assigned by the server
+	// - figure out how to handle this properly, some props are assigned later
 	toWrite := existing
+	// - CAN we just squash the .Spec here? or is that incorrect? Apply should
+	//   be careful, but simple, know nothing about the business logic of the
+	//   operator itself.  Therefore, if one does ApplyRoute(someRoute) would they
+	//   expect it simply to set this, regardless of what is on the server already?
+	//   at this point probably should assume the caller already did a .Get(route)
+	//   and merged properties, if that path was desired.
 	toWrite.Spec = *required.Spec.DeepCopy()
 
 	actual, err := client.Routes(required.Namespace).Update(toWrite)

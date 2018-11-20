@@ -1,23 +1,42 @@
 package secret
 
 import (
-	"k8s.io/api/core/v1"
+	// 3rd
+	"github.com/sirupsen/logrus"
+	// kube
+	corev1 "k8s.io/api/core/v1"
+	// openshift
 	"github.com/openshift/console-operator/pkg/apis/console/v1alpha1"
 	"github.com/openshift/console-operator/pkg/console/subresource/deployment"
 	"github.com/openshift/console-operator/pkg/console/subresource/util"
 )
 
-const dataKey = "clientsecret"
+const ClientSecretKey = "clientSecret"
 
-func DefaultSecret(cr *v1alpha1.Console, randomBits string) *v1.Secret {
+func DefaultSecret(cr *v1alpha1.Console, randomBits string) *corev1.Secret {
+	logrus.Printf("DefaultSecret() %v", randomBits)
 	meta := util.SharedMeta()
 	meta.Name = deployment.ConsoleOauthConfigName
-	secret := &v1.Secret{
+
+	secret := &corev1.Secret{
 		ObjectMeta: meta,
 	}
-	secret.StringData = map[string]string{
-		dataKey: randomBits,
+
+	// TODO: open bug in client-go, it drops StringData :/
+	//secret.StringData = map[string]string{
+	//	ClientSecretKey: randomBits,
+	//}
+
+	secret.Data = map[string][]byte{
+		ClientSecretKey: []byte(randomBits),
 	}
+
+
 	util.AddOwnerRef(secret, util.OwnerRefFrom(cr))
 	return secret
 }
+
+func GetSecretString(secret *corev1.Secret) string {
+	return string(secret.Data[ClientSecretKey])
+}
+

@@ -32,6 +32,9 @@ type ConsoleSpec struct {
 
 type ConsoleStatus struct {
 	v1alpha1.OperatorStatus
+	// set once the router has a default host name
+	DefaultHostName string `json:"defaultHostName"`
+	OAuthSecret string `json""oauthSecret"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
