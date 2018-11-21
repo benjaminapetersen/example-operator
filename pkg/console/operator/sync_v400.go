@@ -73,7 +73,7 @@ func sync_v400(co *ConsoleOperator, consoleConfig *v1alpha1.Console) (*v1alpha1.
 	// - the deployment needs to know about the change value in order to address updates,
 	//   but the wrapper is needed to avoid triggering loops unnecessarily
 	secretChanged := false
-	oauthChanged := false
+	// oauthChanged := false
 	if !secretsMatch(co.secretsClient, co.oauthClient) {
 		// shared secret bits
 		// sharedOAuthSecretBits := crypto.RandomBits(256)
@@ -96,7 +96,6 @@ func sync_v400(co *ConsoleOperator, consoleConfig *v1alpha1.Console) (*v1alpha1.
 			allErrors = append(allErrors, secErr)
 		}
 		toUpdate = toUpdate || secretChanged
-
 	}
 
 
